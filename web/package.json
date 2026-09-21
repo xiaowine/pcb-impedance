@@ -1,0 +1,19 @@
+{
+  "name": "pcb-impedance-web",
+  "version": "1.0.0",
+  "description": "PCB 阻抗匹配系统 Web 验证原型 (Node.js 原生零依赖代理与极速求解服务)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "pcb",
+    "impedance",
+    "jlc",
+    "calculator"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
