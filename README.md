@@ -4,6 +4,12 @@
 
 ---
 
+## 🌐 Web 在线体验
+
+在线访问：[https://pcb-impedance-web.vercel.app/](https://pcb-impedance-web.vercel.app/)
+
+---
+
 ## 🖥️ 界面预览 (GPUI 原生极速版)
 
 ![PCB 阻抗匹配系统 GPUI 原生版运行预览](assets/gpui_preview.png)
