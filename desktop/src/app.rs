@@ -91,6 +91,13 @@ pub fn default_templates() -> Vec<StackupTemplate> {
     ]
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub enum NumericField {
+    W1,
+    S1,
+    D1,
+}
+
 pub struct ImpedanceDesktopApp {
     pub config: BoardConfig,
     pub requirements: Vec<ImpedanceReq>,
@@ -104,10 +111,11 @@ pub struct ImpedanceDesktopApp {
     pub uuid: String,
     pub status_text: String,
     pub is_calculating: bool,
-    pub calc_strategy: String, // "RECOMMENDED_ONLY" | "ALL"
+    pub calc_strategy: String,
     pub scroll_handle: UniformListScrollHandle,
     pub active_dropdown: Option<String>,
     pub editing_zo: Option<(usize, String)>,
+    pub editing_numeric: Option<(usize, NumericField, String)>,
     pub focus_handle: FocusHandle,
 }
 
@@ -155,6 +163,7 @@ impl ImpedanceDesktopApp {
             scroll_handle: UniformListScrollHandle::new(),
             active_dropdown: None,
             editing_zo: None,
+            editing_numeric: None,
             focus_handle: cx.focus_handle(),
         };
 
@@ -262,6 +271,44 @@ impl ImpedanceDesktopApp {
             }
             cx.notify();
         }
+        self.commit_editing_numeric(cx);
+    }
+
+    pub fn commit_editing_numeric(&mut self, cx: &mut Context<Self>) {
+        if let Some((idx, field, text)) = self.editing_numeric.take() {
+            let parsed = text.trim().parse::<f64>().ok();
+            let value = parsed.filter(|value| *value >= 0.01 && *value <= 150.0);
+            if let Some(req) = self.requirements.get_mut(idx) {
+                let changed = match field {
+                    NumericField::W1 => value.is_some_and(|v| (req.w1 - v).abs() > 0.001),
+                    NumericField::S1 => req.s1 != value,
+                    NumericField::D1 => req.d1 != value,
+                };
+                if changed {
+                    match field {
+                        NumericField::W1 => req.w1 = value.unwrap_or(req.w1),
+                        NumericField::S1 => req.s1 = value,
+                        NumericField::D1 => req.d1 = value,
+                    }
+                    self.trigger_calc(cx);
+                }
+            }
+            cx.notify();
+        }
+    }
+
+    pub fn begin_editing_numeric(
+        &mut self,
+        idx: usize,
+        field: NumericField,
+        text: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.commit_editing_zo(cx);
+        self.editing_numeric = Some((idx, field, text));
+        self.focus_handle.focus(window);
+        cx.notify();
     }
 
     pub fn toggle_dropdown(&mut self, id: &str, cx: &mut Context<Self>) {

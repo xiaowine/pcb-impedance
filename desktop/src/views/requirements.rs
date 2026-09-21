@@ -1,11 +1,11 @@
 // src/views/requirements.rs
-use crate::app::ImpedanceDesktopApp;
+use crate::app::{ImpedanceDesktopApp, NumericField};
 use gpui::*;
 
 impl ImpedanceDesktopApp {
     pub fn render_requirements(&self, cx: &Context<Self>) -> impl IntoElement {
         let board_layer = self.config.board_layer;
-
+        let unit = self.config.unit.clone();
         div()
             .flex()
             .flex_col()
@@ -113,14 +113,17 @@ impl ImpedanceDesktopApp {
                             .font_weight(FontWeight::BOLD)
                             .text_xs()
                             .text_color(rgb(0x475569))
-                            .child(div().w(px(32.0)).text_center().child("#"))
-                            .child(div().w(px(140.0)).child("🎯 目标阻抗"))
-                            .child(div().flex_1().child("📐 阻抗模式 (下拉)"))
-                            .child(div().w(px(90.0)).child("📍 走线层"))
-                            .child(div().w(px(90.0)).child("⬆️ 上参考"))
-                            .child(div().w(px(90.0)).child("⬇️ 下参考"))
-                            .child(div().w(px(70.0)).child("⚖️ 容差"))
-                            .child(div().w(px(110.0)).text_center().child("操作")),
+                            .child(div().w(px(32.0)).flex_shrink_0().text_center().whitespace_nowrap().child("#"))
+                            .child(div().w(px(140.0)).flex_shrink_0().whitespace_nowrap().child("🎯 目标阻抗"))
+                            .child(div().flex_1().whitespace_nowrap().child("📐 阻抗模式 (下拉)"))
+                            .child(div().w(px(90.0)).flex_shrink_0().whitespace_nowrap().child("📍 走线层"))
+                            .child(div().w(px(90.0)).flex_shrink_0().whitespace_nowrap().child("⬆️ 上参考"))
+                            .child(div().w(px(90.0)).flex_shrink_0().whitespace_nowrap().child("⬇️ 下参考"))
+                            .child(div().w(px(105.0)).flex_shrink_0().whitespace_nowrap().child(format!("↔️ 线宽 W1 ({})", unit)))
+                            .child(div().w(px(105.0)).flex_shrink_0().whitespace_nowrap().child(format!("↕️ 差分线距 S1 ({})", unit)))
+                            .child(div().w(px(105.0)).flex_shrink_0().whitespace_nowrap().child(format!("📏 共面铜距 D1 ({})", unit)))
+                            .child(div().w(px(70.0)).flex_shrink_0().whitespace_nowrap().child("⚖️ 容差"))
+                            .child(div().w(px(110.0)).flex_shrink_0().text_center().whitespace_nowrap().child("操作")),
                     )
                     // 行数据
                     .children(self.requirements.iter().enumerate().map(|(idx, req)| {
@@ -142,6 +145,96 @@ impl ImpedanceDesktopApp {
                         let down_drop_id = format!("req_{}_down", idx);
                         let is_down_open = self.active_dropdown.as_deref() == Some(&down_drop_id);
 
+                        let render_numeric = |field: NumericField, initial_text: String, unit_label: String, enabled: bool| {
+                            let field_id = match field {
+                                NumericField::W1 => 1,
+                                NumericField::S1 => 2,
+                                NumericField::D1 => 3,
+                            };
+                            let is_editing = enabled && self.editing_numeric.as_ref().map(|(i, active, _)| *i == idx && *active == field).unwrap_or(false);
+                            let edit_text = self.editing_numeric.as_ref().and_then(|(i, active, text)| {
+                                if *i == idx && *active == field { Some(text.clone()) } else { None }
+                            });
+                            let focus_handle = self.focus_handle.clone();
+
+                            if is_editing {
+                                div()
+                                    .id(("numeric_edit", idx * 10 + field_id))
+                                    .track_focus(&focus_handle)
+                                    .w(px(105.0))
+                                    .flex_shrink_0()
+                                    .flex()
+                                    .items_center()
+                                    .justify_between()
+                                    .px_2()
+                                    .py_0p5()
+                                    .bg(rgb(0xffffff))
+                                    .border_2()
+                                    .border_color(if enabled { rgb(0x2563eb) } else { rgb(0xcbd5e1) })
+                                    .rounded_md()
+                                    .child(div().font_weight(FontWeight::BOLD).text_color(if enabled { rgb(0x1d4ed8) } else { rgb(0x94a3b8) }).child(edit_text.unwrap_or_default()))
+                                    .child(div().text_xs().text_color(rgb(0x64748b)).child(unit_label.clone()))
+                                    .on_mouse_down(MouseButton::Left, cx.listener(|_this, _, _, cx| {
+                                        cx.stop_propagation();
+                                    }))
+                                    .on_key_down(cx.listener(move |this, event: &KeyDownEvent, _window, cx| {
+                                        let key = event.keystroke.key.as_str();
+                                        if let Some((i, active, ref mut text)) = this.editing_numeric {
+                                            if i == idx && active == field {
+                                                match key {
+                                                    "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" => {
+                                                        if text.len() < 8 {
+                                                            text.push_str(key);
+                                                            cx.notify();
+                                                        }
+                                                    }
+                                                    "." => {
+                                                        if !text.contains('.') && text.len() < 8 {
+                                                            text.push('.');
+                                                            cx.notify();
+                                                        }
+                                                    }
+                                                    "backspace" => {
+                                                        text.pop();
+                                                        cx.notify();
+                                                    }
+                                                    "enter" | "return" => this.commit_editing_numeric(cx),
+                                                    "escape" => {
+                                                        this.editing_numeric = None;
+                                                        cx.notify();
+                                                    }
+                                                    _ => {}
+                                                }
+                                            }
+                                        }
+                                    }))
+                            } else {
+                                let click_text = initial_text.clone();
+                                div()
+                                    .id(("numeric_view", idx * 10 + field_id))
+                                    .w(px(105.0))
+                                    .flex_shrink_0()
+                                    .flex()
+                                    .items_center()
+                                    .justify_between()
+                                    .px_2()
+                                    .py_0p5()
+                                    .bg(rgb(0xffffff))
+                                    .border_1()
+                                    .border_color(if enabled { rgb(0xcbd5e1) } else { rgb(0xe2e8f0) })
+                                    .rounded_md()
+                                    .cursor(CursorStyle::IBeam)
+                                    .child(div().text_color(if enabled { rgb(0x334155) } else { rgb(0x94a3b8) }).child(if !enabled { "—".to_string() } else if click_text.is_empty() { "—".to_string() } else { click_text }))
+                                    .child(div().text_xs().text_color(rgb(0x64748b)).child(unit_label))
+                                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| {
+                                        if enabled {
+                                            cx.stop_propagation();
+                                            this.begin_editing_numeric(idx, field, initial_text.clone(), window, cx);
+                                        }
+                                    }))
+                            }
+                        };
+
                         div()
                             .flex()
                             .flex_row()
@@ -160,6 +253,7 @@ impl ImpedanceDesktopApp {
                             .child(
                                 div()
                                     .w(px(32.0))
+                                    .flex_shrink_0()
                                     .text_center()
                                     .child(
                                         div()
@@ -186,6 +280,7 @@ impl ImpedanceDesktopApp {
                                         .id(("zo_edit", idx))
                                         .track_focus(&focus_handle)
                                         .w(px(140.0))
+                                        .flex_shrink_0()
                                         .flex()
                                         .flex_row()
                                         .items_center()
@@ -263,6 +358,7 @@ impl ImpedanceDesktopApp {
                                     div()
                                         .id(("zo_view", idx))
                                         .w(px(140.0))
+                                        .flex_shrink_0()
                                         .flex()
                                         .flex_row()
                                         .items_center()
@@ -405,6 +501,7 @@ impl ImpedanceDesktopApp {
                                 div()
                                     .relative()
                                     .w(px(90.0))
+                                    .flex_shrink_0()
                                     .child(
                                         div()
                                             .flex()
@@ -470,6 +567,7 @@ impl ImpedanceDesktopApp {
                                 div()
                                     .relative()
                                     .w(px(90.0))
+                                    .flex_shrink_0()
                                     .child(
                                         div()
                                             .flex()
@@ -551,6 +649,7 @@ impl ImpedanceDesktopApp {
                                 div()
                                     .relative()
                                     .w(px(90.0))
+                                    .flex_shrink_0()
                                     .child(
                                         div()
                                             .flex()
@@ -627,10 +726,14 @@ impl ImpedanceDesktopApp {
                                         deferred(div()).with_priority(0)
                                     }),
                             )
+                            .child(render_numeric(NumericField::W1, format!("{:.2}", req.w1), unit.clone(), true))
+                            .child(render_numeric(NumericField::S1, req.s1.map(|v| format!("{:.2}", v)).unwrap_or_default(), unit.clone(), true))
+                            .child(render_numeric(NumericField::D1, req.d1.map(|v| format!("{:.2}", v)).unwrap_or_default(), unit.clone(), cur_mode.contains("共面")))
                             // 容差
                             .child(
                                 div()
                                     .w(px(70.0))
+                                    .flex_shrink_0()
                                     .text_color(rgb(0x475569))
                                     .font_weight(FontWeight::BOLD)
                                     .child("±0.5Ω"),
@@ -639,6 +742,7 @@ impl ImpedanceDesktopApp {
                             .child(
                                 div()
                                     .w(px(110.0))
+                                    .flex_shrink_0()
                                     .flex()
                                     .flex_row()
                                     .justify_center()
