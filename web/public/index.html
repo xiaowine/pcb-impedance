@@ -358,19 +358,18 @@
           <!-- 策略单选 -->
           <div class="bg-black/20 p-1 rounded-xl flex items-center text-xs">
             <button 
-              @click="calcStrategy = 'RECOMMENDED_ONLY'" 
+              @click="setStrategy('RECOMMENDED_ONLY')" 
               :class="calcStrategy === 'RECOMMENDED_ONLY' ? 'bg-white text-blue-800 shadow font-bold' : 'text-blue-100 hover:text-white'"
               class="whitespace-nowrap px-3 py-1.5 rounded-lg transition">
               ⚡ 仅计算推荐叠层 (推荐·毫秒级)
             </button>
             <button 
-              @click="calcStrategy = 'ALL_BOUNDED'" 
+              @click="setStrategy('ALL_BOUNDED')" 
               :class="calcStrategy === 'ALL_BOUNDED' ? 'bg-white text-blue-800 shadow font-bold' : 'text-blue-100 hover:text-white'"
               class="whitespace-nowrap px-3 py-1.5 rounded-lg transition">
               🔄 计算全部叠层 (受控并发)
             </button>
           </div>
-
           <button 
             @click="triggerCalculation" 
             :disabled="calculating"

@@ -83,18 +83,51 @@ const app = createApp({
       }
     };
 
-    // 过滤展示的叠层模板 (置顶优先)
+    // 过滤展示的叠层模板 (支持仅推荐 / 显示全部，置顶优先)
     const filteredTemplates = computed(() => {
-      const list = [...templates.value];
+      let list = [...templates.value];
+      if (!list.length) return [];
+
+      if (calcStrategy.value === 'RECOMMENDED_ONLY') {
+        const commonList = list.filter(t => t.isCommon).slice(0, 2);
+        if (pinnedTemplateCode.value) {
+          const pinned = list.find(t => t.code === pinnedTemplateCode.value);
+          if (pinned && !commonList.some(t => t.code === pinned.code)) {
+            list = [pinned, ...commonList];
+          } else {
+            list = commonList;
+          }
+        } else {
+          list = commonList;
+        }
+      } else {
+        if (pinnedTemplateCode.value) {
+          const idx = list.findIndex(t => t.code === pinnedTemplateCode.value);
+          if (idx !== -1) {
+            const [pinned] = list.splice(idx, 1);
+            list.unshift(pinned);
+          }
+        }
+      }
+
+      // 保证置顶排在第1位
       if (pinnedTemplateCode.value) {
         const idx = list.findIndex(t => t.code === pinnedTemplateCode.value);
-        if (idx !== -1) {
+        if (idx > 0) {
           const [pinned] = list.splice(idx, 1);
           list.unshift(pinned);
         }
       }
+
       return list;
     });
+
+    // 切换计算策略并即刻触发对应计算
+    const setStrategy = async (strategy) => {
+      if (calcStrategy.value === strategy) return;
+      calcStrategy.value = strategy;
+      await triggerCalculation();
+    };
     // 获取特定叠层的计算结果列表
     const getTemplateResults = (templateCode) => {
       return resultsMap.get(templateCode) || requirements.value.map(req => ({
@@ -135,9 +168,8 @@ const app = createApp({
 
       // 决定计算的目标叠层
       const targetTemplates = calcStrategy.value === 'RECOMMENDED_ONLY'
-        ? templates.value.filter(t => t.isCommon).slice(0, 2)
+        ? filteredTemplates.value
         : templates.value;
-
       // 初始化占位结果
       for (const tmpl of targetTemplates) {
         const initialResults = requirements.value.map(req => ({
@@ -369,6 +401,7 @@ const app = createApp({
       filteredTemplates,
       calculating,
       calcStrategy,
+      setStrategy,
       availableLayers,
       cacheStats,
       queueStats,
