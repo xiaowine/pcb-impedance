@@ -4,6 +4,12 @@
 
 ---
 
+## 🖥️ 界面预览 (GPUI 原生极速版)
+
+![PCB 阻抗匹配系统 GPUI 原生版运行预览](assets/gpui_preview.png)
+
+---
+
 ## 📁 目录结构总览
 
 ```text
