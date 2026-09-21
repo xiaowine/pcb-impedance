@@ -76,9 +76,13 @@ export class ImpedanceEngine {
 
     const payload = {
       pageNum: 1,
-      pageSize: 100,
+      pageSize: 99999,
       plateLayerNumber: layer,
-      plateThickness: thickness
+      plateThickness: thickness,
+      cuprumThickness: Number(outerOz) || 1,
+      boardType: config.plateType === 'HDI' ? 2 : 1,
+      usePurpose: 1,
+      innerCopperThickness: Number(innerOz) || 0.5
     };
 
     const resp = await fetch(`${this.apiBase}/selectPageImpedanceDefaultTemplate`, {
@@ -90,20 +94,10 @@ export class ImpedanceEngine {
     const res = await resp.json();
     const rawList = res.body?.list || [];
 
-    // 根据外层与内层铜厚过滤（如 1H 代表外层1oz，内层0.5oz；11 代表外层1oz，内层1oz；22 代表外层2oz，内层2oz）
-    let copperTag = '1H';
-    if (outerOz === '1' && innerOz === '0.5') copperTag = '1H';
-    else if (outerOz === '1' && innerOz === '1') copperTag = '11';
-    else if (outerOz === '2' && innerOz === '1') copperTag = '21';
-    else if (outerOz === '2' && innerOz === '2') copperTag = '22';
-
-    let filteredList = rawList.filter(item => item.appointName?.includes(copperTag));
-    if (filteredList.length === 0) {
-      filteredList = rawList;
-    }
+    // 源网页由后端依据板材、铜厚和用途参数筛选模板，不在客户端二次猜测名称。
 
     // 标记官方推荐/通用叠层
-    const processedList = filteredList.map(item => {
+    const processedList = rawList.map(item => {
       const name = item.appointName || item.laminatedConstructionName || '未知叠构';
       const isCommon = name.includes('7628') || name.includes('通用') || item.defaultFlag === 1;
       return {
@@ -130,51 +124,81 @@ export class ImpedanceEngine {
       return { H1: 8.126, Er1: 4.3, H2: 8.126, Er2: 4.3, T1: 1.6 };
     }
 
-    const isOuter = upRefNum === null || downRefNum === null;
-    let targetH1 = 0;
-    let targetEr1 = 4.3;
-    let targetH2 = 0;
-    let targetEr2 = 4.3;
+    const totalLayers = template.plateLayerNumber || 4;
+    const isTop = layerNum === 1;
+    const isBottom = layerNum >= totalLayers;
+    const isInner = !isTop && !isBottom;
+    const isOuter = isTop || isBottom || upRefNum === null || downRefNum === null;
+    const segmentMm = Array(totalLayers + 1).fill(0);
+    const conductorMm = Array(totalLayers + 1).fill(0);
+    let currentLayer = 1;
+    let pendingDielectricMm = 0;
 
-    if (isOuter) {
-      let thicknessSumMm = 0;
-      let erSum = 0;
-      let count = 0;
+    const parseLayers = (name) => (name || '')
+      .split('/')
+      .map(part => Number(part.trim().replace(/^L/, '')))
+      .filter(Number.isFinite);
 
-      for (const item of list) {
-        if (item.materialType === 2) {
-          const thickMm = Number(item.dielectricThick || item.thickness || 0.1);
-          thicknessSumMm += thickMm;
-          erSum += (Number(item.dielectricConstant || 4.3) * thickMm);
-          count++;
-          break;
-        }
+    for (const item of list) {
+      if (item.materialType === 0) {
+        pendingDielectricMm += Number(item.dielectricThick || item.thickness || 0);
+        continue;
       }
 
-      if (thicknessSumMm === 0) {
-        thicknessSumMm = 0.2;
+      const layers = parseLayers(item.layerName);
+      if (item.materialType === 2 && layers.length >= 2) {
+        const [topLayer, bottomLayer] = layers;
+        if (currentLayer < topLayer) segmentMm[currentLayer] = pendingDielectricMm;
+        pendingDielectricMm = 0;
+        segmentMm[topLayer] = Number(item.dielectricThick || 0);
+        conductorMm[topLayer] = Number(item.topConductorThick || 0);
+        conductorMm[bottomLayer] = Number(item.botConductorThick || 0);
+        currentLayer = bottomLayer;
+        continue;
       }
 
-      targetH1 = thicknessSumMm * 39.3700787;
-      targetEr1 = count > 0 ? (erSum / thicknessSumMm) : 4.3;
-    } else {
-      const totalThickMm = Number(template.plateThickness || 1.6);
-      const layersCount = Math.max(1, (template.plateLayerNumber || 4) - 1);
-      const avgH1_mil = (totalThickMm / layersCount) * 39.3700787 * 0.8;
-      targetH1 = avgH1_mil;
-      targetH2 = avgH1_mil;
-      targetEr1 = 4.3;
-      targetEr2 = 4.3;
+      if (item.materialType === 1 && layers.length >= 1) {
+        const layer = layers[0];
+        if (currentLayer < layer) segmentMm[currentLayer] = pendingDielectricMm;
+        pendingDielectricMm = 0;
+        conductorMm[layer] = Number(item.topConductorThick || 0);
+        currentLayer = layer;
+      }
     }
 
-    const T1 = isOuter ? 1.6 : 0.6;
+    const outerDistanceMm = (fromLayer, toLayer) => {
+      if (!fromLayer || !toLayer || fromLayer === toLayer) return 0;
+      const low = Math.min(fromLayer, toLayer);
+      const high = Math.max(fromLayer, toLayer);
+      let distance = 0;
+      for (let layer = low; layer < high; layer++) distance += segmentMm[layer] || 0;
+      for (let layer = low + 1; layer < high; layer++) distance += conductorMm[layer] || 0;
+      return distance * 39.3700787;
+    };
+
+    const innerUpperDistanceMm = (traceLayer, upperRef) => (
+      outerDistanceMm(traceLayer, upperRef) + (conductorMm[traceLayer] || 0) * 39.3700787
+    );
+
+    let targetH1;
+    let targetH2 = 0;
+    if (isInner) {
+      targetH1 = downRefNum ? outerDistanceMm(layerNum, downRefNum) : 8.126;
+      targetH2 = upRefNum ? innerUpperDistanceMm(layerNum, upRefNum) : 8.126;
+    } else {
+      const reference = downRefNum || upRefNum;
+      targetH1 = reference ? outerDistanceMm(layerNum, reference) : 8.126;
+    }
+
+    if (!targetH1) targetH1 = 8.126;
+    if (!targetH2 && isInner) targetH2 = 8.126;
 
     return {
-      H1: Number(targetH1.toFixed(3)),
-      Er1: Number(targetEr1.toFixed(2)),
-      H2: Number(targetH2.toFixed(3)),
-      Er2: Number(targetEr2.toFixed(2)),
-      T1
+      H1: Number(targetH1.toFixed(4)),
+      Er1: 4.3,
+      H2: Number(targetH2.toFixed(4)),
+      Er2: 4.3,
+      T1: isOuter ? 1.6 : 0.6
     };
   }
 
@@ -191,11 +215,15 @@ export class ImpedanceEngine {
 
     if (isDiff) {
       if (isCoplanar) {
-        calcMark = 'W2_DiffCoatedCoplanarWaveguideWithLowerGnd1B';
+        calcMark = isNoMask
+          ? 'W2_DiffSurfaceCoplanarWaveguideWithLowerGnd1B'
+          : 'W2_DiffCoatedCoplanarWaveguideWithLowerGnd1B';
       } else if (isInner) {
         calcMark = 'W2_DiffOffsetStripline1B1A';
       } else {
-        calcMark = 'W2_DiffEdgeCoupledCoatedMicrostrip1B';
+        calcMark = isNoMask
+          ? 'W2_DiffEdgeCoupledSurfaceMicrostrip1B'
+          : 'W2_DiffEdgeCoupledCoatedMicrostrip1B';
       }
     } else if (isCoplanar) {
       if (isNoMask) {
@@ -217,15 +245,24 @@ export class ImpedanceEngine {
       req.unit || 'mil'
     );
 
+    // 源网页各拓扑默认线宽：仅带防焊外层单端用 8/7.5，外层差分微带用 5.2/4.7，其余（共面/内层/不带防焊）用 7/6.5
+    const isOuterMicrostrip = !isCoplanar && !isInner;
+    const isCoatedOuterSingle = isOuterMicrostrip && !isDiff && !isNoMask;
+    const isDiffOuterMicrostrip = isOuterMicrostrip && isDiff;
+    const defaultW1 = isCoatedOuterSingle ? 8 : (isDiffOuterMicrostrip ? 5.2 : 7);
+    const defaultW2 = isCoatedOuterSingle ? 7.5 : (isDiffOuterMicrostrip ? 4.7 : 6.5);
+    // 源网页默认线距：外层差分微带（不带防焊）为 5，其余差分为 8
+    const defaultS1 = (isDiffOuterMicrostrip && isNoMask) ? 5 : 8;
+    // 源网页默认共面铜距：带防焊共面单端为 20，不带防焊共面与共面差分均为 8
+    const defaultD1 = isDiff ? 8 : (isNoMask ? 8 : 20);
+
     const calcArg = {
+      // 源网页 共面单端阻抗（不带防焊） 使用 Er1 = 4.2，其余拓扑均为 4.3
       H1,
-      Er1,
-      W1: Number(req.w1 || (isDiff ? 5.2 : 8.0)),
-      W2: Number(req.w2 || (isDiff ? 4.5 : 7.5)),
+      Er1: (isCoplanar && !isDiff && isNoMask) ? 4.2 : Er1,
+      W1: Number(req.w1 || defaultW1),
+      W2: Number(req.w2 || defaultW2),
       T1,
-      C1: isNoMask ? 0 : 1.2,
-      C2: isNoMask ? 0 : 0.6,
-      CEr: isNoMask ? 1.0 : 3.8,
       Zo: Number(req.targetZo || (isDiff ? 90 : 50)),
       dCalculateMode: mode === 'forward' ? 3 : 1,
       isLinkComputingMode: false,
@@ -235,14 +272,19 @@ export class ImpedanceEngine {
       MaxW2: 150
     };
 
+    if (!isInner && !isNoMask) {
+      calcArg.C1 = 1;
+      calcArg.C2 = 0.6;
+      calcArg.CEr = 3.8;
+    }
+
     if (isDiff) {
-      calcArg.S1 = Number(req.s1 || 8.0);
-      calcArg.C3 = isNoMask ? 0 : 1.2;
-      calcArg.HZ0 = 108;
+      calcArg.S1 = Number(req.s1 || defaultS1);
+      if (!isInner && !isNoMask) calcArg.C3 = 1;
     }
 
     if (isCoplanar) {
-      calcArg.D1 = Number(req.d1 || 8.0);
+      calcArg.D1 = Number(req.d1 || defaultD1);
     }
 
     if (isInner) {

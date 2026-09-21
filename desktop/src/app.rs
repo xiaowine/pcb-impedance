@@ -168,7 +168,7 @@ impl ImpedanceDesktopApp {
         };
 
         // 预热默认通用叠构的计算结果，实现启动 0 秒即时呈现，杜绝启动白屏或卡顿
-        let key_50 = ImpedanceCache::generate_key("JLC041611-7628B", "req_1", 50.0, 1);
+        let key_50 = ImpedanceCache::generate_key("JLC041611-7628B", &app.requirements[0]);
         app.cache.set(key_50, ImpedanceResult {
             req_id: "req_1".to_string(),
             target_zo: 50.0,
@@ -189,7 +189,7 @@ impl ImpedanceDesktopApp {
             is_loading: false,
         });
 
-        let key_90 = ImpedanceCache::generate_key("JLC041611-7628B", "req_2", 90.0, 1);
+        let key_90 = ImpedanceCache::generate_key("JLC041611-7628B", &app.requirements[1]);
         app.cache.set(key_90, ImpedanceResult {
             req_id: "req_2".to_string(),
             target_zo: 90.0,
@@ -210,7 +210,7 @@ impl ImpedanceDesktopApp {
             is_loading: false,
         });
 
-        let key_50_a = ImpedanceCache::generate_key("JLC04161H-7628A", "req_1", 50.0, 1);
+        let key_50_a = ImpedanceCache::generate_key("JLC04161H-7628A", &app.requirements[0]);
         app.cache.set(key_50_a, ImpedanceResult {
             req_id: "req_1".to_string(),
             target_zo: 50.0,
@@ -231,7 +231,7 @@ impl ImpedanceDesktopApp {
             is_loading: false,
         });
 
-        let key_90_a = ImpedanceCache::generate_key("JLC04161H-7628A", "req_2", 90.0, 1);
+        let key_90_a = ImpedanceCache::generate_key("JLC04161H-7628A", &app.requirements[1]);
         app.cache.set(key_90_a, ImpedanceResult {
             req_id: "req_2".to_string(),
             target_zo: 90.0,
@@ -372,7 +372,6 @@ impl ImpedanceDesktopApp {
             self.templates
                 .iter()
                 .filter(|t| t.is_common)
-                .take(2)
                 .cloned()
                 .collect()
         } else {
@@ -384,7 +383,7 @@ impl ImpedanceDesktopApp {
         for tmpl in &target_templates {
             let mut tmpl_results = Vec::new();
             for req in &self.requirements {
-                let cache_key = ImpedanceCache::generate_key(&tmpl.code, &req.id, req.target_zo, req.layer);
+                let cache_key = ImpedanceCache::generate_key(&tmpl.code, req);
                 if let Some(cached) = self.cache.get(&cache_key) {
                     tmpl_results.push(cached);
                 } else {
@@ -445,7 +444,7 @@ impl ImpedanceDesktopApp {
         let task = cx.background_executor().spawn(async move {
             let mut tmpl_results = Vec::new();
             for req in &reqs {
-                let cache_key = ImpedanceCache::generate_key(&tmpl.code, &req.id, req.target_zo, req.layer);
+                let cache_key = ImpedanceCache::generate_key(&tmpl.code, req);
                 if let Some(cached) = cache.get(&cache_key) {
                     tmpl_results.push(cached);
                 } else if let Ok(res) = client.calc_impedance(&tmpl, req, &uuid) {
@@ -570,6 +569,30 @@ impl ImpedanceDesktopApp {
         cx.notify();
         if self.config.board_layer != layers {
             self.config.board_layer = layers;
+            for req in &mut self.requirements {
+                if req.layer > layers {
+                    req.layer = layers;
+                }
+                if req.layer == 1 {
+                    req.up_ref = None;
+                    if req.down_ref.map_or(true, |d| d <= 1 || d > layers) {
+                        req.down_ref = (layers >= 2).then_some(2);
+                    }
+                } else if req.layer == layers {
+                    req.down_ref = None;
+                    if req.up_ref.map_or(true, |u| u >= layers) {
+                        req.up_ref = Some(layers.saturating_sub(1).max(1));
+                    }
+                } else {
+                    if req.up_ref.map_or(true, |u| u >= req.layer) {
+                        req.up_ref = Some(req.layer - 1);
+                    }
+                    if req.down_ref.map_or(true, |d| d <= req.layer || d > layers) {
+                        req.down_ref = Some(req.layer + 1);
+                    }
+                }
+                Self::apply_mode_defaults(req, layers);
+            }
             self.load_templates(cx);
         }
     }
@@ -624,20 +647,43 @@ impl ImpedanceDesktopApp {
         }
     }
 
-    pub fn adjust_target_zo(&mut self, req_idx: usize, delta: f64, cx: &mut Context<Self>) {
-        self.commit_editing_zo(cx);
-        if let Some(req) = self.requirements.get_mut(req_idx) {
-            req.target_zo = (req.target_zo + delta).max(10.0).min(200.0);
-            self.trigger_calc(cx);
-        }
+
+    /// 按源网页各拓扑设置默认线宽/线距/共面距
+    fn apply_mode_defaults(req: &mut ImpedanceReq, total_layers: u32) {
+        let is_diff = req.mode.contains("差分");
+        let is_coplanar = req.mode.contains("共面");
+        let is_no_mask = req.mode.contains("不带防焊");
+        let is_inner = req.layer > 1 && req.layer < total_layers;
+        let is_outer_microstrip = !is_coplanar && !is_inner;
+        let is_coated_outer_single = is_outer_microstrip && !is_diff && !is_no_mask;
+        let is_diff_outer_microstrip = is_outer_microstrip && is_diff;
+        req.w1 = if is_coated_outer_single {
+            8.0
+        } else if is_diff_outer_microstrip {
+            5.2
+        } else {
+            7.0
+        };
+        req.s1 = if is_diff {
+            Some(if is_diff_outer_microstrip && is_no_mask { 5.0 } else { 8.0 })
+        } else {
+            None
+        };
+        req.d1 = if is_coplanar {
+            Some(if is_diff || is_no_mask { 8.0 } else { 20.0 })
+        } else {
+            None
+        };
     }
 
     pub fn set_req_mode(&mut self, req_idx: usize, mode: &str, cx: &mut Context<Self>) {
         self.active_dropdown = None;
         cx.notify();
+        let total_layers = self.config.board_layer;
         if let Some(req) = self.requirements.get_mut(req_idx) {
             if req.mode != mode {
                 req.mode = mode.to_string();
+                Self::apply_mode_defaults(req, total_layers);
                 self.trigger_calc(cx);
             }
         }
@@ -646,19 +692,22 @@ impl ImpedanceDesktopApp {
     pub fn set_req_layer(&mut self, req_idx: usize, layer: u32, cx: &mut Context<Self>) {
         self.active_dropdown = None;
         cx.notify();
+        let board_layer = self.config.board_layer;
         if let Some(req) = self.requirements.get_mut(req_idx) {
+            let layer = layer.clamp(1, board_layer);
             if req.layer != layer {
                 req.layer = layer;
                 if layer == 1 {
                     req.up_ref = None;
-                    req.down_ref = Some(2);
-                } else if layer == self.config.board_layer {
-                    req.up_ref = Some(layer - 1);
+                    req.down_ref = (board_layer >= 2).then_some(2);
+                } else if layer == board_layer {
+                    req.up_ref = Some(layer.saturating_sub(1).max(1));
                     req.down_ref = None;
                 } else {
                     req.up_ref = Some(layer - 1);
                     req.down_ref = Some(layer + 1);
                 }
+                Self::apply_mode_defaults(req, board_layer);
                 self.trigger_calc(cx);
             }
         }
@@ -668,8 +717,9 @@ impl ImpedanceDesktopApp {
         self.active_dropdown = None;
         cx.notify();
         if let Some(req) = self.requirements.get_mut(req_idx) {
-            if req.up_ref != up_ref {
-                req.up_ref = up_ref;
+            let valid_up_ref = up_ref.filter(|&l| l < req.layer);
+            if req.up_ref != valid_up_ref {
+                req.up_ref = valid_up_ref;
                 self.trigger_calc(cx);
             }
         }
@@ -678,9 +728,11 @@ impl ImpedanceDesktopApp {
     pub fn set_req_down_ref(&mut self, req_idx: usize, down_ref: Option<u32>, cx: &mut Context<Self>) {
         self.active_dropdown = None;
         cx.notify();
+        let board_layer = self.config.board_layer;
         if let Some(req) = self.requirements.get_mut(req_idx) {
-            if req.down_ref != down_ref {
-                req.down_ref = down_ref;
+            let valid_down_ref = down_ref.filter(|&l| l > req.layer && l <= board_layer);
+            if req.down_ref != valid_down_ref {
+                req.down_ref = valid_down_ref;
                 self.trigger_calc(cx);
             }
         }

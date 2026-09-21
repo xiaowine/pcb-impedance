@@ -55,11 +55,14 @@ impl JlcApiClient {
         let base_url = self.base_url.clone();
         let payload = json!({
             "pageNum": 1,
-            "pageSize": 100,
+            "pageSize": 99999,
             "plateLayerNumber": config.board_layer,
             "plateThickness": config.finished_thickness,
+            "cuprumThickness": config.cuprum_thickness.parse::<f64>().unwrap_or(1.0),
+            "boardType": if config.plate_type == "HDI" { 2 } else { 1 },
+            "usePurpose": 1,
+            "innerCopperThickness": config.inner_copper_thickness.parse::<f64>().unwrap_or(0.5),
         });
-        let copper_tag = format!("{}H", config.cuprum_thickness);
 
         self.rt.block_on(async move {
             let url = format!("{}/selectPageImpedanceDefaultTemplate", base_url);
@@ -76,14 +79,11 @@ impl JlcApiClient {
                     .unwrap_or("未知叠构")
                     .to_string();
 
-                if !name.contains(&copper_tag) && !name.contains("1H") && !name.contains("7628") {
-                    continue;
-                }
-
                 let code = item["laminatedConstructionCode"]
                     .as_str()
                     .unwrap_or(&name)
                     .to_string();
+
 
                 let is_common = name.contains("7628")
                     || name.contains("通用")
@@ -121,6 +121,111 @@ impl JlcApiClient {
             Ok(templates)
         })
     }
+    fn extract_dielectric_params(
+        template: &StackupTemplate,
+        req: &ImpedanceReq,
+    ) -> (f64, f64, f64, f64, f64) {
+        let total_layers = template.plate_layer_number;
+        let is_top = req.layer == 1;
+        let is_bottom = req.layer >= total_layers;
+        let is_inner = !is_top && !is_bottom;
+        let is_outer = is_top || is_bottom || req.up_ref.is_none() || req.down_ref.is_none();
+        let t1 = if is_outer { 1.6 } else { 0.6 };
+
+        let items = &template.basic_data_list;
+        if items.is_empty() {
+            return (8.126, 4.3, 8.126, 4.3, t1);
+        }
+
+        let mut segment_mm = vec![0.0; total_layers as usize + 1];
+        let mut conductor_mm = vec![0.0; total_layers as usize + 1];
+        let mut current_layer = 1usize;
+        let mut pending_dielectric_mm = 0.0;
+
+        for item in items {
+            if item.material_type == Some(0) {
+                pending_dielectric_mm += item.dielectric_thick.unwrap_or(0.0);
+                continue;
+            }
+
+            let layers: Vec<u32> = item
+                .layer_name
+                .as_deref()
+                .unwrap_or("")
+                .split('/')
+                .filter_map(|part| part.trim_start_matches('L').parse::<u32>().ok())
+                .collect();
+
+            if item.material_type == Some(2) && layers.len() >= 2 {
+                let top_layer = layers[0] as usize;
+                let bottom_layer = layers[1] as usize;
+                if current_layer < top_layer && current_layer < segment_mm.len() {
+                    segment_mm[current_layer] = pending_dielectric_mm;
+                }
+                pending_dielectric_mm = 0.0;
+                if top_layer < segment_mm.len() {
+                    segment_mm[top_layer] = item.dielectric_thick.unwrap_or(0.0);
+                    conductor_mm[top_layer] = item.top_conductor_thick.unwrap_or(0.0);
+                }
+                if bottom_layer < conductor_mm.len() {
+                    conductor_mm[bottom_layer] = item.top_conductor_thick.unwrap_or(0.0);
+                }
+                current_layer = bottom_layer;
+                continue;
+            }
+
+            if item.material_type == Some(1) && !layers.is_empty() {
+                let layer = layers[0] as usize;
+                if current_layer < layer && current_layer < segment_mm.len() {
+                    segment_mm[current_layer] = pending_dielectric_mm;
+                }
+                pending_dielectric_mm = 0.0;
+                if layer < conductor_mm.len() {
+                    conductor_mm[layer] = item.top_conductor_thick.unwrap_or(0.0);
+                }
+                current_layer = layer;
+            }
+        }
+
+        let outer_distance_mm = |from_layer: u32, to_layer: u32| -> f64 {
+            if from_layer == 0 || to_layer == 0 || from_layer == to_layer {
+                return 0.0;
+            }
+            let low = from_layer.min(to_layer) as usize;
+            let high = from_layer.max(to_layer) as usize;
+            let mut distance = 0.0;
+            for layer in low..high {
+                distance += segment_mm.get(layer).copied().unwrap_or(0.0);
+            }
+            for layer in (low + 1)..high {
+                distance += conductor_mm.get(layer).copied().unwrap_or(0.0);
+            }
+            distance * 39.3700787
+        };
+
+        let inner_upper_distance_mm = |trace_layer: u32, upper_ref: u32| -> f64 {
+            outer_distance_mm(trace_layer, upper_ref)
+                + conductor_mm.get(trace_layer as usize).copied().unwrap_or(0.0) * 39.3700787
+        };
+
+        let (target_h1, target_h2) = if is_inner {
+            (
+                req.down_ref.map(|r| outer_distance_mm(req.layer, r)).unwrap_or(8.126),
+                req.up_ref.map(|r| inner_upper_distance_mm(req.layer, r)).unwrap_or(8.126),
+            )
+        } else {
+            let reference = req.down_ref.or(req.up_ref);
+            (reference.map(|r| outer_distance_mm(req.layer, r)).filter(|h| *h > 0.0).unwrap_or(8.126), 0.0)
+        };
+
+        (
+            (target_h1 * 10000.0).round() / 10000.0,
+            4.3,
+            (target_h2 * 10000.0).round() / 10000.0,
+            4.3,
+            t1,
+        )
+    }
 
     /// 执行阻抗求解
     pub fn calc_impedance(
@@ -136,9 +241,15 @@ impl JlcApiClient {
 
         let calc_mark = if is_diff {
             if is_coplanar {
-                "W2_DiffCoatedCoplanarWaveguideWithLowerGnd1B"
+                if is_no_mask {
+                    "W2_DiffSurfaceCoplanarWaveguideWithLowerGnd1B"
+                } else {
+                    "W2_DiffCoatedCoplanarWaveguideWithLowerGnd1B"
+                }
             } else if is_inner {
                 "W2_DiffOffsetStripline1B1A"
+            } else if is_no_mask {
+                "W2_DiffEdgeCoupledSurfaceMicrostrip1B"
             } else {
                 "W2_DiffEdgeCoupledCoatedMicrostrip1B"
             }
@@ -158,23 +269,35 @@ impl JlcApiClient {
             }
         };
 
-        let h1 = 8.126;
-        let er1 = 4.3;
-        let t1 = if req.layer == 1 || req.layer == template.plate_layer_number {
-            1.6
+        let (h1, er1, h2, er2, t1) = Self::extract_dielectric_params(template, req);
+
+        // 源网页各拓扑默认参数：仅带防焊外层单端 8/7.5，外层差分微带 5.2/4.7，其余（共面/内层/不带防焊）7/6.5
+        let is_outer_microstrip = !is_coplanar && !is_inner;
+        let is_coated_outer_single = is_outer_microstrip && !is_diff && !is_no_mask;
+        let is_diff_outer_microstrip = is_outer_microstrip && is_diff;
+        let default_w1 = if is_coated_outer_single {
+            8.0
+        } else if is_diff_outer_microstrip {
+            5.2
         } else {
-            0.6
+            7.0
         };
+        let default_w2 = if is_coated_outer_single {
+            7.5
+        } else if is_diff_outer_microstrip {
+            4.7
+        } else {
+            6.5
+        };
+        // 源网页 共面单端阻抗（不带防焊） 使用 Er1 = 4.2，其余拓扑均为 4.3
+        let er1 = if is_coplanar && !is_diff && is_no_mask { 4.2 } else { er1 };
 
         let mut calc_arg = json!({
             "H1": h1,
             "Er1": er1,
-            "W1": if is_diff { 5.2 } else { 8.0 },
-            "W2": if is_diff { 4.5 } else { 7.5 },
+            "W1": if req.w1 > 0.0 { req.w1 } else { default_w1 },
+            "W2": default_w2,
             "T1": t1,
-            "C1": if is_no_mask { 0.0 } else { 1.2 },
-            "C2": if is_no_mask { 0.0 } else { 0.6 },
-            "CEr": if is_no_mask { 1.0 } else { 3.8 },
             "Zo": req.target_zo,
             "dCalculateMode": 3,
             "isLinkComputingMode": false,
@@ -184,14 +307,28 @@ impl JlcApiClient {
             "MaxW2": 150
         });
 
+        if !is_inner && !is_no_mask {
+            calc_arg["C1"] = json!(1.0);
+            calc_arg["C2"] = json!(0.6);
+            calc_arg["CEr"] = json!(3.8);
+        }
+
         if is_diff {
-            calc_arg["S1"] = json!(req.s1.unwrap_or(5.5));
-            calc_arg["C3"] = json!(if is_no_mask { 0.0 } else { 1.2 });
-            calc_arg["HZ0"] = json!(108);
+            let default_s1 = if is_diff_outer_microstrip && is_no_mask { 5.0 } else { 8.0 };
+            calc_arg["S1"] = json!(req.s1.unwrap_or(default_s1));
+            if !is_inner && !is_no_mask {
+                calc_arg["C3"] = json!(1.0);
+            }
         }
 
         if is_coplanar {
-            calc_arg["D1"] = json!(req.d1.unwrap_or(8.0));
+            let default_d1 = if is_diff || is_no_mask { 8.0 } else { 20.0 };
+            calc_arg["D1"] = json!(req.d1.unwrap_or(default_d1));
+        }
+
+        if is_inner {
+            calc_arg["H2"] = json!(h2);
+            calc_arg["Er2"] = json!(er2);
         }
 
         let access_id = format!("gpui-{}", uuid::Uuid::new_v4());
@@ -241,8 +378,8 @@ impl JlcApiClient {
                         tolerance: req.tolerance,
                         w1,
                         w2,
-                        s1: req.s1,
-                        d1: req.d1,
+                        s1: req.mode.contains("差分").then(|| req.s1.unwrap_or(8.0)),
+                        d1: req.mode.contains("共面").then(|| req.d1.unwrap_or(8.0)),
                         actual_zo,
                         delay,
                         er_eff,
@@ -293,8 +430,8 @@ impl JlcApiClient {
             tolerance: req.tolerance,
             w1: Some((best_w * 100.0).round() / 100.0),
             w2: Some(((best_w - 0.5) * 100.0).round() / 100.0),
-            s1: req.s1,
-            d1: req.d1,
+            s1: req.mode.contains("差分").then(|| req.s1.unwrap_or(8.0)),
+            d1: req.mode.contains("共面").then(|| req.d1.unwrap_or(8.0)),
             actual_zo: Some(zo),
             delay: Some(5800.0),
             er_eff: Some(3.2),

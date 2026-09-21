@@ -13,7 +13,7 @@ export class StackupVisualizer {
     const width = options.width || 480;
     const list = template.basicDataList || [];
     if (!list.length) {
-      return `<svg width="${width}" height="100"><text x="20" y="50" fill="#94a3b8">暂无叠层详细材料数据</text></svg>`;
+      return `<svg viewBox="0 0 480 100" width="100%" height="100" preserveAspectRatio="xMinYMid meet" class="max-w-full"><text x="20" y="50" fill="#94a3b8">暂无叠层详细材料数据</text></svg>`;
     }
 
     const marginX = 80;

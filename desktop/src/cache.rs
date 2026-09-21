@@ -1,5 +1,5 @@
 // src/cache.rs
-use crate::models::ImpedanceResult;
+use crate::models::{ImpedanceReq, ImpedanceResult};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -19,8 +19,21 @@ impl ImpedanceCache {
         }
     }
 
-    pub fn generate_key(template_code: &str, req_id: &str, zo: f64, layer: u32) -> String {
-        format!("{}_{}_{:.1}_{}", template_code, req_id, zo, layer)
+    pub fn generate_key(template_code: &str, req: &ImpedanceReq) -> String {
+        format!(
+            "{}_{}_{:.3}_{}_{}_{}_{:?}_{:?}_{:.3}_{:?}_{:?}",
+            template_code,
+            req.id,
+            req.target_zo,
+            req.mode,
+            req.layer,
+            req.tolerance,
+            req.up_ref,
+            req.down_ref,
+            req.w1,
+            req.s1,
+            req.d1,
+        )
     }
 
     pub fn get(&self, key: &str) -> Option<ImpedanceResult> {

@@ -31,20 +31,20 @@
     }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800 antialiased min-h-screen">
-  <div id="app" v-cloak class="max-w-7xl mx-auto px-4 py-6">
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen overflow-x-clip">
+  <div id="app" v-cloak class="w-full min-w-0 max-w-7xl mx-auto px-4 py-6">
     
     <!-- 顶部导航与性能监控状态栏 -->
-    <header class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 mb-6">
-      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div class="flex items-center space-x-3">
+    <header class="w-full min-w-0 bg-white border border-slate-200 rounded-2xl shadow-sm p-4 mb-6">
+      <div class="flex min-w-0 flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div class="min-w-0 flex items-center space-x-3">
           <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-md">
             Ω
           </div>
           <div>
-            <h1 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <h1 class="min-w-0 text-xl font-bold text-slate-900 flex flex-wrap items-center gap-2 break-words">
               PCB 阻抗匹配与叠层设计系统
-              <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">高性能重构版</span>
+              <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium whitespace-nowrap">高性能重构版</span>
             </h1>
             <p class="text-xs text-slate-500">复用嘉立创后端求解内核 · 彻底解决多阻抗全量计算卡顿痛点</p>
           </div>
@@ -203,172 +203,166 @@
       </div>
 
       <!-- 阻抗列表表格 -->
-      <div class="overflow-x-auto border-2 border-slate-200 rounded-2xl shadow-sm bg-white">
+      <div class="min-w-0 max-w-full overflow-x-auto border-2 border-slate-200 rounded-2xl shadow-sm bg-white">
         <table class="w-full text-left border-collapse text-xs">
           <thead>
             <tr class="bg-slate-100/80 text-slate-700 border-b-2 border-slate-200 font-bold">
-              <th class="p-3 w-12 text-center whitespace-nowrap">#</th>
-              <th class="p-3 min-w-[140px] whitespace-nowrap">🎯 目标阻抗 (Ω)</th>
-              <th class="p-3 min-w-[200px] whitespace-nowrap">📐 阻抗拓扑模式</th>
-              <th class="p-3 min-w-[120px] whitespace-nowrap">📍 走线层</th>
-              <th class="p-3 min-w-[130px] whitespace-nowrap">⬆️ 上参考层</th>
-              <th class="p-3 min-w-[130px] whitespace-nowrap">⬇️ 下参考层</th>
-              <th class="p-3 min-w-[130px] whitespace-nowrap">↔️ 线宽 W1 ({{ form.unit }})</th>
-              <th class="p-3 min-w-[130px] whitespace-nowrap">↕️ 差分线距 S1 ({{ form.unit }})</th>
-              <th class="p-3 min-w-[130px] whitespace-nowrap">📏 共面铜距 D1 ({{ form.unit }})</th>
-              <th class="p-3 min-w-[130px] whitespace-nowrap">⚖️ 容差公差 (±Ω)</th>
-              <th class="p-3 min-w-[170px] text-center whitespace-nowrap">操作</th>
+              <th class="p-2 w-9 text-center whitespace-nowrap">#</th>
+              <th class="p-2 min-w-[76px] whitespace-nowrap">🎯 阻抗</th>
+              <th class="p-2 min-w-[135px] whitespace-nowrap">📐 拓扑模式</th>
+              <th class="p-2 min-w-[60px] whitespace-nowrap">📍 走线</th>
+              <th class="p-2 min-w-[60px] whitespace-nowrap">⬆️ 上参考</th>
+              <th class="p-2 min-w-[60px] whitespace-nowrap">⬇️ 下参考</th>
+              <th class="p-2 min-w-[76px] whitespace-nowrap">↔️ W1 ({{ form.unit }})</th>
+              <th class="p-2 min-w-[76px] whitespace-nowrap">↕️ S1 ({{ form.unit }})</th>
+              <th class="p-2 min-w-[76px] whitespace-nowrap">📏 D1 ({{ form.unit }})</th>
+              <th class="p-2 min-w-[85px] text-center whitespace-nowrap">操作</th>
+            </tr>
           </thead>
           <tbody class="divide-y divide-slate-200">
             <tr v-for="(req, idx) in requirements" :key="req.id" class="hover:bg-blue-50/40 transition">
               <!-- 序号 -->
-              <td class="p-3 text-center">
-                <span class="w-6 h-6 rounded-full bg-slate-200 text-slate-700 font-bold inline-flex items-center justify-center text-xs">
+              <td class="p-2 text-center">
+                <span class="w-5 h-5 rounded-full bg-slate-200 text-slate-700 font-bold inline-flex items-center justify-center text-xs">
                   {{ idx + 1 }}
                 </span>
               </td>
 
-              <!-- 目标阻抗 (明显的输入框) -->
-              <td class="p-3">
+              <!-- 目标阻抗 -->
+              <td class="p-2">
                 <div class="relative flex items-center group">
                   <input 
                     type="number" 
                     v-model.number="req.targetZo" 
-                    class="w-full pl-3 pr-8 py-2 bg-white border-2 border-slate-300 group-hover:border-blue-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-xl text-sm font-black text-blue-700 shadow-sm cursor-text transition" 
+                    class="w-full pl-2 pr-6 py-1 bg-white border border-slate-300 group-hover:border-blue-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-100 rounded-lg text-xs font-bold text-blue-700 shadow-xs cursor-text transition"
                     step="1" min="10" max="200" placeholder="50" />
-                  <span class="absolute right-3 text-xs font-black text-slate-400 select-none">Ω</span>
+                  <span class="absolute right-2 text-xs font-bold text-slate-400 select-none">Ω</span>
                 </div>
               </td>
 
-              <!-- 阻抗拓扑模式 (明显的下拉选择框) -->
-              <td class="p-3">
+              <!-- 阻抗拓扑模式 -->
+              <td class="p-2">
                 <div class="relative group">
                   <select 
                     v-model="req.mode" 
-                    class="w-full appearance-none pl-3 pr-8 py-2 bg-white border-2 border-slate-300 group-hover:border-indigo-400 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 rounded-xl text-xs font-bold text-slate-800 shadow-sm cursor-pointer transition">
+                    @change="onModeChange(req)"
+                    class="w-full appearance-none pl-2 pr-6 py-1 bg-white border border-slate-300 group-hover:border-indigo-400 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-100 rounded-lg text-xs font-bold text-slate-800 shadow-xs cursor-pointer transition">
                     <option value="单端阻抗（外层）">单端阻抗（外层）</option>
                     <option value="差分阻抗（外层）">差分阻抗（外层）</option>
-                    <option value="共面单端（外层）">共面单端（外层）</option>
-                    <option value="共面差分阻抗（外层）">共面差分阻抗（外层）</option>
                     <option value="单端阻抗（内层）">单端阻抗（内层）</option>
                     <option value="差分阻抗（内层）">差分阻抗（内层）</option>
+                    <option value="共面单端（外层）">共面单端（外层）</option>
+                    <option value="共面差分阻抗（外层）">共面差分阻抗（外层）</option>
                     <option value="单端阻抗（不带防焊）">单端阻抗（不带防焊）</option>
+                    <option value="差分阻抗（不带防焊）">差分阻抗（不带防焊）</option>
+                    <option value="共面单端阻抗（不带防焊）">共面单端阻抗（不带防焊）</option>
+                    <option value="共面差分阻抗（不带防焊）">共面差分阻抗（不带防焊）</option>
                   </select>
-                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-400 group-hover:text-indigo-600 transition">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg>
+                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1.5 text-slate-400 group-hover:text-indigo-600 transition">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg>
                   </div>
                 </div>
               </td>
 
-              <!-- 走线层 (醒目的层位选择卡片) -->
-              <td class="p-3">
+              <!-- 走线层 -->
+              <td class="p-2">
                 <div class="relative group">
                   <select 
                     v-model.number="req.layer" 
-                    class="w-full appearance-none pl-3 pr-7 py-2 bg-indigo-50/70 group-hover:bg-white border-2 border-indigo-200 group-hover:border-indigo-400 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 rounded-xl text-xs font-extrabold text-indigo-700 shadow-sm cursor-pointer transition">
-                    <option v-for="l in availableLayers" :key="l" :value="l">L{{ l }} 层</option>
+                    @change="onLayerChange(req)"
+                    class="w-full appearance-none pl-2 pr-5 py-1 bg-indigo-50/70 group-hover:bg-white border border-indigo-200 group-hover:border-indigo-400 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-100 rounded-lg text-xs font-extrabold text-indigo-700 shadow-xs cursor-pointer transition">
+                    <option v-for="l in availableLayers" :key="l" :value="l">L{{ l }}</option>
                   </select>
-                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-indigo-500 group-hover:text-indigo-700 transition">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg>
+                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-indigo-500 group-hover:text-indigo-700 transition">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg>
                   </div>
                 </div>
               </td>
 
               <!-- 上参考层 -->
-              <td class="p-3">
+              <td class="p-2">
                 <div class="relative group">
                   <select 
                     v-model="req.upRef" 
-                    class="w-full appearance-none pl-3 pr-7 py-2 bg-slate-50 group-hover:bg-white border-2 border-slate-200 group-hover:border-blue-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-xl text-xs font-bold text-slate-700 shadow-sm cursor-pointer transition">
-                    <option :value="null">/ (无参考)</option>
-                    <option v-for="l in availableLayers" :key="l" :value="l">L{{ l }} 层</option>
+                    :disabled="req.layer <= 1"
+                    class="w-full appearance-none pl-2 pr-5 py-1 bg-slate-50 group-hover:bg-white border border-slate-200 group-hover:border-blue-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-100 rounded-lg text-xs font-bold text-slate-700 shadow-xs cursor-pointer transition disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed">
+                    <option :value="null">/</option>
+                    <option v-for="l in availableLayers.filter(l => l < req.layer)" :key="l" :value="l">L{{ l }}</option>
                   </select>
-                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400 group-hover:text-blue-600 transition">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg>
+                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-slate-400 group-hover:text-blue-600 transition">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg>
                   </div>
                 </div>
               </td>
 
               <!-- 下参考层 -->
-              <td class="p-3">
+              <td class="p-2">
                 <div class="relative group">
                   <select 
                     v-model="req.downRef" 
-                    class="w-full appearance-none pl-3 pr-7 py-2 bg-slate-50 group-hover:bg-white border-2 border-slate-200 group-hover:border-blue-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-xl text-xs font-bold text-slate-700 shadow-sm cursor-pointer transition">
-                    <option :value="null">/ (无参考)</option>
-                    <option v-for="l in availableLayers" :key="l" :value="l">L{{ l }} 层</option>
+                    :disabled="req.layer >= (form.boardLayer || 4)"
+                    class="w-full appearance-none pl-2 pr-5 py-1 bg-slate-50 group-hover:bg-white border border-slate-200 group-hover:border-blue-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-100 rounded-lg text-xs font-bold text-slate-700 shadow-xs cursor-pointer transition disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed">
+                    <option :value="null">/</option>
+                    <option v-for="l in availableLayers.filter(l => l > req.layer)" :key="l" :value="l">L{{ l }}</option>
                   </select>
-                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400 group-hover:text-blue-600 transition">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg>
+                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-slate-400 group-hover:text-blue-600 transition">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg>
                   </div>
                 </div>
               </td>
 
-              <!-- 线宽 W1：所有拓扑统一可填写 -->
-              <td class="p-3">
+              <!-- 线宽 W1 -->
+              <td class="p-2">
                 <div class="relative flex items-center group">
                   <input
                     type="number"
                     v-model.number="req.w1"
-                    class="w-full pl-3 pr-10 py-2 bg-white border-2 border-slate-300 group-hover:border-emerald-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 rounded-xl text-xs font-bold text-emerald-700 shadow-sm cursor-text transition"
+                    class="w-full pl-2 pr-7 py-1 bg-white border border-slate-300 group-hover:border-emerald-400 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-100 rounded-lg text-xs font-bold text-emerald-700 shadow-xs cursor-text transition"
                     step="0.01" min="0.01" max="150" placeholder="8.00" />
-                  <span class="absolute right-2.5 text-xs font-black text-slate-400 select-none">{{ form.unit }}</span>
+                  <span class="absolute right-1.5 text-xs text-slate-400 select-none">{{ form.unit }}</span>
                 </div>
               </td>
 
-              <!-- 差分线距 S1：单端模式也保留可填写字段，便于切换拓扑时复用 -->
-              <td class="p-3">
-                <div class="relative flex items-center group">
+              <!-- 差分线距 S1 -->
+              <td class="p-2 text-center">
+                <div v-if="req.mode.includes('差分')" class="relative flex items-center group">
                   <input
                     type="number"
                     v-model.number="req.s1"
-                    class="w-full pl-3 pr-10 py-2 bg-white border-2 border-slate-300 group-hover:border-indigo-400 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 rounded-xl text-xs font-bold text-indigo-700 shadow-sm cursor-text transition"
-                    step="0.01" min="0.01" max="150" placeholder="5.50" />
-                  <span class="absolute right-2.5 text-xs font-black text-slate-400 select-none">{{ form.unit }}</span>
+                    class="w-full pl-2 pr-7 py-1 bg-white border border-slate-300 group-hover:border-indigo-400 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-100 rounded-lg text-xs font-bold text-indigo-700 shadow-xs cursor-text transition"
+                    step="0.01" min="0.01" max="150" placeholder="8.00" />
+                  <span class="absolute right-1.5 text-xs text-slate-400 select-none">{{ form.unit }}</span>
                 </div>
+                <span v-else class="text-slate-400 text-xs font-bold select-none">/</span>
               </td>
 
-              <!-- 共面铜距 D1：仅共面单端/共面差分可编辑，其他模式禁用 -->
-              <td class="p-3">
-                <div class="relative flex items-center group">
+              <!-- 共面铜距 D1 -->
+              <td class="p-2 text-center">
+                <div v-if="req.mode.includes('共面')" class="relative flex items-center group">
                   <input
                     type="number"
                     v-model.number="req.d1"
-                    :disabled="!req.mode.includes('共面')"
-                    :placeholder="req.mode.includes('共面') ? '8.00' : '仅共面模式'"
-                    class="w-full pl-3 pr-10 py-2 bg-white border-2 border-slate-300 group-hover:border-amber-400 focus:border-amber-600 focus:ring-2 focus:ring-amber-100 rounded-xl text-xs font-bold text-amber-700 shadow-sm cursor-text transition disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed disabled:opacity-70"
-                    step="0.01" min="0.01" max="150" />
-                  <span class="absolute right-2.5 text-xs font-black text-slate-400 select-none">{{ form.unit }}</span>
+                    class="w-full pl-2 pr-7 py-1 bg-white border border-slate-300 group-hover:border-amber-400 focus:border-amber-600 focus:ring-1 focus:ring-amber-100 rounded-lg text-xs font-bold text-amber-700 shadow-xs cursor-text transition"
+                    step="0.01" min="0.01" max="150" placeholder="8.00" />
+                  <span class="absolute right-1.5 text-xs text-slate-400 select-none">{{ form.unit }}</span>
                 </div>
+                <span v-else class="text-slate-400 text-xs font-bold select-none">/</span>
               </td>
 
-              <!-- 容差公差 -->
-              <td class="p-3">
-                <div class="relative flex items-center group">
-                  <span class="absolute left-3 text-xs font-black text-slate-400 select-none">±</span>
-                  <input
-                    type="number"
-                    v-model.number="req.tolerance"
-                    class="w-full pl-7 pr-7 py-2 bg-white border-2 border-slate-300 group-hover:border-blue-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-xl text-xs font-bold text-slate-700 shadow-sm cursor-text transition"
-                    step="0.1" min="0.1" max="5" />
-                  <span class="absolute right-2.5 text-xs font-black text-slate-400 select-none">Ω</span>
-                </div>
-              </td>
-
-              <!-- 操作按钮 (保证单行不折行) -->
-              <td class="p-3 text-center whitespace-nowrap">
-                <div class="flex items-center justify-center space-x-2">
+              <!-- 操作按钮 -->
+              <td class="p-2 text-center whitespace-nowrap">
+                <div class="flex items-center justify-center space-x-1.5">
                   <button 
                     @click="copyRequirement(idx)" 
-                    class="whitespace-nowrap px-3 py-1.5 bg-slate-100 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 border border-slate-200 rounded-lg text-slate-700 font-semibold transition inline-flex items-center gap-1 shadow-xs" 
+                    class="whitespace-nowrap px-2 py-1 bg-slate-100 hover:bg-blue-50 hover:text-blue-700 border border-slate-200 rounded-lg text-slate-700 text-xs font-medium transition inline-flex items-center shadow-xs"
                     title="复制此行要求">
-                    <span>📋</span> 复制
+                    复制
                   </button>
                   <button 
                     @click="removeRequirement(idx)" 
-                    class="whitespace-nowrap px-3 py-1.5 bg-slate-100 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 border border-slate-200 rounded-lg text-slate-700 font-semibold transition inline-flex items-center gap-1 shadow-xs" 
+                    class="whitespace-nowrap px-2 py-1 bg-slate-100 hover:bg-rose-50 hover:text-rose-700 border border-slate-200 rounded-lg text-slate-700 text-xs font-medium transition inline-flex items-center shadow-xs"
                     title="删除此行要求">
-                    <span>🗑️</span> 删除
+                    删除
                   </button>
                 </div>
               </td>
@@ -394,9 +388,9 @@
           </p>
         </div>
 
-        <div class="flex flex-wrap items-center gap-3">
+        <div class="w-full min-w-0 flex flex-col sm:flex-row sm:items-center gap-3 md:w-auto">
           <!-- 策略单选 -->
-          <div class="bg-black/20 p-1 rounded-xl flex items-center text-xs">
+          <div class="w-full sm:w-auto min-w-0 max-w-full overflow-x-auto bg-black/20 p-1 rounded-xl flex items-center text-xs">
             <button 
               @click="setStrategy('RECOMMENDED_ONLY')" 
               :class="calcStrategy === 'RECOMMENDED_ONLY' ? 'bg-white text-blue-800 shadow font-bold' : 'text-blue-100 hover:text-white'"
@@ -413,7 +407,7 @@
           <button 
             @click="triggerCalculation" 
             :disabled="calculating"
-            class="whitespace-nowrap px-6 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-bold text-sm rounded-xl shadow-md transition inline-flex items-center gap-2">
+            class="w-full sm:w-auto justify-center whitespace-nowrap px-6 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-bold text-sm rounded-xl shadow-md transition inline-flex items-center gap-2">
             <span v-if="calculating" class="animate-spin text-lg">⚙</span>
             <span>{{ calculating ? '计算中...' : '立即执行计算' }}</span>
           </button>
@@ -446,18 +440,18 @@
       <!-- 叠层卡片列表 -->
       <div v-for="(tmpl, tIdx) in filteredTemplates" :key="tmpl.code"
         :ref="(el) => setupCardObserver(el, tmpl)"
-        class="bg-white border rounded-2xl shadow-sm overflow-hidden transition"
+        class="min-w-0 max-w-full bg-white border rounded-2xl shadow-sm overflow-hidden transition"
         :class="tmpl.isCommon ? 'border-blue-300 ring-1 ring-blue-100' : 'border-slate-200'">
         <!-- 卡片头部 -->
-        <div class="p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+        <div class="min-w-0 p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
           :class="tmpl.isCommon ? 'bg-blue-50/50' : 'bg-slate-50/50'">
-          <div>
-            <div class="flex items-center gap-2">
+          <div class="min-w-0">
+            <div class="min-w-0 flex flex-wrap items-center gap-2">
               <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
                 :class="tmpl.isCommon ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-700'">
                 {{ tIdx + 1 }}
               </span>
-              <h3 class="font-bold text-base text-slate-900">{{ tmpl.displayName }}</h3>
+              <h3 class="min-w-0 max-w-full font-bold text-base text-slate-900 break-words">{{ tmpl.displayName }}</h3>
               <span v-if="pinnedTemplateCode === tmpl.code" class="px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-600 text-white shadow-xs">
                 📍 已置顶
               </span>
@@ -472,7 +466,7 @@
           </div>
 
           <!-- 卡片操作 -->
-          <div class="flex items-center gap-2 flex-shrink-0">
+          <div class="w-full md:w-auto flex flex-wrap items-center justify-start md:justify-end gap-2">
             <button 
               @click="pinTemplate(tmpl.code)" 
               :class="pinnedTemplateCode === tmpl.code ? 'bg-indigo-50 text-indigo-700 border-indigo-400 font-bold' : 'bg-white text-slate-700 border-slate-300'"
@@ -495,9 +489,9 @@
         </div>
 
         <!-- 阻抗计算结果表格 -->
-        <div class="p-5">
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs border-collapse">
+        <div class="min-w-0 p-5">
+          <div class="min-w-0 max-w-full overflow-x-auto">
+            <table class="w-full min-w-[1100px] text-left text-xs border-collapse">
               <thead>
                 <tr class="bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold">
                   <th class="p-2.5">需求阻抗</th>
@@ -554,21 +548,21 @@
           </div>
 
           <!-- 折叠内容：SVG 剖面图与材料详细表格 -->
-          <div v-if="tmpl.expanded" class="mt-5 pt-5 border-t border-slate-200 grid grid-cols-1 lg:grid-cols-2 gap-6 bg-slate-50/50 p-4 rounded-xl">
+          <div v-if="tmpl.expanded" class="min-w-0 mt-5 pt-5 border-t border-slate-200 grid grid-cols-1 lg:grid-cols-2 gap-6 bg-slate-50/50 p-4 rounded-xl">
             <!-- 左侧：动态 SVG 剖面图 -->
-            <div>
+            <div class="min-w-0">
               <h4 class="font-bold text-xs text-slate-700 mb-2 flex items-center gap-1">
                 <span>📐</span> PCB 物理叠层截面图 (真实比例)
               </h4>
-              <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-inner" v-html="renderSVG(tmpl)"></div>
+              <div class="min-w-0 max-w-full overflow-x-auto bg-white p-3 rounded-lg border border-slate-200 shadow-inner" v-html="renderSVG(tmpl)"></div>
             </div>
 
             <!-- 右侧：材料清单表格 -->
-            <div>
+            <div class="min-w-0">
               <h4 class="font-bold text-xs text-slate-700 mb-2 flex items-center gap-1">
                 <span>📋</span> 详细材料与介质参数
               </h4>
-              <div class="overflow-x-auto bg-white rounded-lg border border-slate-200">
+              <div class="min-w-0 max-w-full overflow-x-auto bg-white rounded-lg border border-slate-200">
                 <table class="w-full text-left text-xs">
                   <thead class="bg-slate-100 text-slate-600">
                     <tr>

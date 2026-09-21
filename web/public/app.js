@@ -89,7 +89,7 @@ const app = createApp({
       if (!list.length) return [];
 
       if (calcStrategy.value === 'RECOMMENDED_ONLY') {
-        const commonList = list.filter(t => t.isCommon).slice(0, 2);
+        const commonList = list.filter(t => t.isCommon);
         if (pinnedTemplateCode.value) {
           const pinned = list.find(t => t.code === pinnedTemplateCode.value);
           if (pinned && !commonList.some(t => t.code === pinned.code)) {
@@ -356,7 +356,77 @@ const app = createApp({
     };
 
     const onConfigChange = () => {
+      const totalLayers = form.boardLayer || 4;
+      for (const req of requirements.value) {
+        if (req.layer > totalLayers) {
+          req.layer = totalLayers;
+        }
+        if (req.layer <= 1) {
+          req.upRef = null;
+          if (!req.downRef || req.downRef <= 1 || req.downRef > totalLayers) {
+            req.downRef = Math.min(2, totalLayers);
+          }
+        } else if (req.layer >= totalLayers) {
+          req.downRef = null;
+          if (!req.upRef || req.upRef >= totalLayers) {
+            req.upRef = Math.max(1, totalLayers - 1);
+          }
+        } else {
+          if (!req.upRef || req.upRef >= req.layer) {
+            req.upRef = req.layer - 1;
+          }
+          if (!req.downRef || req.downRef <= req.layer || req.downRef > totalLayers) {
+            req.downRef = Math.min(totalLayers, req.layer + 1);
+          }
+        }
+        applyModeDefaults(req);
+      }
       loadTemplates();
+    };
+
+    // 源网页各拓扑默认参数：仅带防焊外层单端 8/7.5，外层差分微带 5.2/4.7，其余 7/6.5
+    const applyModeDefaults = (req) => {
+      const totalLayers = form.boardLayer || 4;
+      const isDiff = req.mode.includes('差分');
+      const isCoplanar = req.mode.includes('共面');
+      const isNoMask = req.mode.includes('不带防焊');
+      const isInner = req.layer > 1 && req.layer < totalLayers;
+      const isOuterMicrostrip = !isCoplanar && !isInner;
+      const isCoatedOuterSingle = isOuterMicrostrip && !isDiff && !isNoMask;
+      const isDiffOuterMicrostrip = isOuterMicrostrip && isDiff;
+      req.w1 = isCoatedOuterSingle ? 8 : (isDiffOuterMicrostrip ? 5.2 : 7);
+      req.s1 = isDiff ? ((isDiffOuterMicrostrip && isNoMask) ? 5 : 8) : null;
+      req.d1 = isCoplanar ? (isDiff ? 8 : (isNoMask ? 8 : 20)) : null;
+    };
+
+    const onLayerChange = (req) => {
+      const totalLayers = form.boardLayer || 4;
+      req.layer = Math.max(1, Math.min(totalLayers, Number(req.layer) || 1));
+      if (req.layer <= 1) {
+        req.upRef = null;
+        if (!req.downRef || req.downRef <= 1) {
+          req.downRef = Math.min(2, totalLayers);
+        }
+      } else if (req.layer >= totalLayers) {
+        req.downRef = null;
+        if (!req.upRef || req.upRef >= totalLayers) {
+          req.upRef = Math.max(1, totalLayers - 1);
+        }
+      } else {
+        if (!req.upRef || req.upRef >= req.layer) {
+          req.upRef = req.layer - 1;
+        }
+        if (!req.downRef || req.downRef <= req.layer) {
+          req.downRef = Math.min(totalLayers, req.layer + 1);
+        }
+      }
+      applyModeDefaults(req);
+      triggerCalculation();
+    };
+
+    const onModeChange = (req) => {
+      applyModeDefaults(req);
+      triggerCalculation();
     };
 
     const clearCache = () => {
@@ -413,6 +483,8 @@ const app = createApp({
       copyRequirement,
       removeRequirement,
       onConfigChange,
+      onModeChange,
+      onLayerChange,
       clearCache,
       renderSVG,
       exportCSV,

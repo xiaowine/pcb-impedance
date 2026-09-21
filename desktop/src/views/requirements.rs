@@ -99,7 +99,8 @@ impl ImpedanceDesktopApp {
                     .border_1()
                     .border_color(rgb(0xe2e8f0))
                     .rounded_xl()
-                    .overflow_hidden()
+                    .id("requirements_scroll")
+                    .overflow_scroll()
                     // 表头
                     .child(
                         div()
@@ -113,17 +114,16 @@ impl ImpedanceDesktopApp {
                             .font_weight(FontWeight::BOLD)
                             .text_xs()
                             .text_color(rgb(0x475569))
-                            .child(div().w(px(32.0)).flex_shrink_0().text_center().whitespace_nowrap().child("#"))
-                            .child(div().w(px(140.0)).flex_shrink_0().whitespace_nowrap().child("🎯 目标阻抗"))
-                            .child(div().flex_1().whitespace_nowrap().child("📐 阻抗模式 (下拉)"))
-                            .child(div().w(px(90.0)).flex_shrink_0().whitespace_nowrap().child("📍 走线层"))
-                            .child(div().w(px(90.0)).flex_shrink_0().whitespace_nowrap().child("⬆️ 上参考"))
-                            .child(div().w(px(90.0)).flex_shrink_0().whitespace_nowrap().child("⬇️ 下参考"))
-                            .child(div().w(px(105.0)).flex_shrink_0().whitespace_nowrap().child(format!("↔️ 线宽 W1 ({})", unit)))
-                            .child(div().w(px(105.0)).flex_shrink_0().whitespace_nowrap().child(format!("↕️ 差分线距 S1 ({})", unit)))
-                            .child(div().w(px(105.0)).flex_shrink_0().whitespace_nowrap().child(format!("📏 共面铜距 D1 ({})", unit)))
-                            .child(div().w(px(70.0)).flex_shrink_0().whitespace_nowrap().child("⚖️ 容差"))
-                            .child(div().w(px(110.0)).flex_shrink_0().text_center().whitespace_nowrap().child("操作")),
+                            .child(div().w(px(28.0)).flex_shrink_0().text_center().whitespace_nowrap().child("#"))
+                            .child(div().w(px(76.0)).flex_shrink_0().whitespace_nowrap().child("🎯 阻抗"))
+                            .child(div().w(px(135.0)).flex_shrink_0().whitespace_nowrap().child("📐 拓扑模式"))
+                            .child(div().w(px(60.0)).flex_shrink_0().whitespace_nowrap().child("📍 走线"))
+                            .child(div().w(px(60.0)).flex_shrink_0().whitespace_nowrap().child("⬆️ 上参考"))
+                            .child(div().w(px(60.0)).flex_shrink_0().whitespace_nowrap().child("⬇️ 下参考"))
+                            .child(div().w(px(76.0)).flex_shrink_0().whitespace_nowrap().child(format!("↔️ W1 ({})", unit)))
+                            .child(div().w(px(76.0)).flex_shrink_0().whitespace_nowrap().child(format!("↕️ S1 ({})", unit)))
+                            .child(div().w(px(76.0)).flex_shrink_0().whitespace_nowrap().child(format!("📏 D1 ({})", unit)))
+                            .child(div().w(px(85.0)).flex_shrink_0().text_center().whitespace_nowrap().child("操作")),
                     )
                     // 行数据
                     .children(self.requirements.iter().enumerate().map(|(idx, req)| {
@@ -144,6 +144,8 @@ impl ImpedanceDesktopApp {
 
                         let down_drop_id = format!("req_{}_down", idx);
                         let is_down_open = self.active_dropdown.as_deref() == Some(&down_drop_id);
+                        let can_have_up = cur_layer > 1;
+                        let can_have_down = cur_layer < board_layer;
 
                         let render_numeric = |field: NumericField, initial_text: String, unit_label: String, enabled: bool| {
                             let field_id = match field {
@@ -161,7 +163,7 @@ impl ImpedanceDesktopApp {
                                 div()
                                     .id(("numeric_edit", idx * 10 + field_id))
                                     .track_focus(&focus_handle)
-                                    .w(px(105.0))
+                                    .w(px(76.0))
                                     .flex_shrink_0()
                                     .flex()
                                     .items_center()
@@ -208,23 +210,33 @@ impl ImpedanceDesktopApp {
                                             }
                                         }
                                     }))
+                            } else if !enabled {
+                                div()
+                                    .id(("numeric_disabled", idx * 10 + field_id))
+                                    .w(px(76.0))
+                                    .flex_shrink_0()
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .py_0p5()
+                                    .child(div().text_xs().text_color(rgb(0x94a3b8)).child("/"))
                             } else {
                                 let click_text = initial_text.clone();
                                 div()
                                     .id(("numeric_view", idx * 10 + field_id))
-                                    .w(px(105.0))
+                                    .w(px(76.0))
                                     .flex_shrink_0()
                                     .flex()
                                     .items_center()
                                     .justify_between()
-                                    .px_2()
+                                    .px_1p5()
                                     .py_0p5()
                                     .bg(rgb(0xffffff))
                                     .border_1()
                                     .border_color(if enabled { rgb(0xcbd5e1) } else { rgb(0xe2e8f0) })
                                     .rounded_md()
                                     .cursor(CursorStyle::IBeam)
-                                    .child(div().text_color(if enabled { rgb(0x334155) } else { rgb(0x94a3b8) }).child(if !enabled { "—".to_string() } else if click_text.is_empty() { "—".to_string() } else { click_text }))
+                                    .child(div().text_color(if enabled { rgb(0x334155) } else { rgb(0x94a3b8) }).text_xs().child(if click_text.is_empty() { "—".to_string() } else { click_text }))
                                     .child(div().text_xs().text_color(rgb(0x64748b)).child(unit_label))
                                     .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| {
                                         if enabled {
@@ -252,7 +264,7 @@ impl ImpedanceDesktopApp {
                             // 序号
                             .child(
                                 div()
-                                    .w(px(32.0))
+                                    .w(px(28.0))
                                     .flex_shrink_0()
                                     .text_center()
                                     .child(
@@ -269,7 +281,7 @@ impl ImpedanceDesktopApp {
                                             .child(format!("{}", idx + 1)),
                                     ),
                             )
-                            // 目标阻抗输入框 + 微调
+                            // 目标阻抗输入框 (紧凑型，点击即编辑)
                             .child({
                                 let is_editing = self.editing_zo.as_ref().map(|(i, _)| *i == idx).unwrap_or(false);
                                 let edit_text = self.editing_zo.as_ref().and_then(|(i, t)| if *i == idx { Some(t.clone()) } else { None });
@@ -279,42 +291,29 @@ impl ImpedanceDesktopApp {
                                     div()
                                         .id(("zo_edit", idx))
                                         .track_focus(&focus_handle)
-                                        .w(px(140.0))
+                                        .w(px(76.0))
                                         .flex_shrink_0()
                                         .flex()
                                         .flex_row()
                                         .items_center()
                                         .justify_between()
-                                        .px_2()
+                                        .px_1p5()
                                         .py_0p5()
                                         .bg(rgb(0xffffff))
                                         .border_2()
                                         .border_color(rgb(0x2563eb))
-                                        .rounded_lg()
+                                        .rounded_md()
                                         .shadow_sm()
                                         .child(
                                             div()
-                                                .flex()
-                                                .flex_row()
-                                                .items_center()
-                                                .child(
-                                                    div()
-                                                        .font_weight(FontWeight::BOLD)
-                                                        .text_sm()
-                                                        .text_color(rgb(0x1d4ed8))
-                                                        .child(edit_text.unwrap_or_default()),
-                                                )
-                                                .child(
-                                                    div()
-                                                        .font_weight(FontWeight::BOLD)
-                                                        .text_color(rgb(0x2563eb))
-                                                        .child("|"),
-                                                ),
+                                                .font_weight(FontWeight::BOLD)
+                                                .text_xs()
+                                                .text_color(rgb(0x1d4ed8))
+                                                .child(edit_text.unwrap_or_default()),
                                         )
                                         .child(
                                             div()
                                                 .text_xs()
-                                                .font_weight(FontWeight::BOLD)
                                                 .text_color(rgb(0x64748b))
                                                 .child("Ω"),
                                         )
@@ -357,85 +356,47 @@ impl ImpedanceDesktopApp {
                                 } else {
                                     div()
                                         .id(("zo_view", idx))
-                                        .w(px(140.0))
+                                        .w(px(76.0))
                                         .flex_shrink_0()
                                         .flex()
                                         .flex_row()
                                         .items_center()
-                                        .gap_1()
+                                        .justify_between()
+                                        .px_1p5()
+                                        .py_0p5()
+                                        .bg(rgb(0xffffff))
+                                        .border_1()
+                                        .border_color(rgb(0xcbd5e1))
+                                        .rounded_md()
+                                        .cursor(CursorStyle::IBeam)
+                                        .hover(|s| s.border_color(rgb(0x2563eb)).shadow_sm())
                                         .child(
                                             div()
-                                                .px_2()
-                                                .py_0p5()
-                                                .bg(rgb(0xf1f5f9))
-                                                .border_1()
-                                                .border_color(rgb(0xcbd5e1))
-                                                .rounded_md()
-                                                .cursor_pointer()
-                                                .hover(|s| s.bg(rgb(0xe2e8f0)))
-                                                .child("-5")
-                                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                                                    cx.stop_propagation();
-                                                    this.adjust_target_zo(idx, -5.0, cx);
-                                                })),
+                                                .font_weight(FontWeight::BOLD)
+                                                .text_xs()
+                                                .text_color(rgb(0x1d4ed8))
+                                                .child(format!("{:.0}", cur_zo)),
                                         )
                                         .child(
                                             div()
-                                                .flex_1()
-                                                .flex()
-                                                .flex_row()
-                                                .items_center()
-                                                .justify_between()
-                                                .px_2()
-                                                .py_0p5()
-                                                .bg(rgb(0xffffff))
-                                                .border_1()
-                                                .border_color(rgb(0x93c5fd))
-                                                .rounded_md()
-                                                .cursor(CursorStyle::IBeam)
-                                                .hover(|s| s.border_color(rgb(0x2563eb)).shadow_sm())
-                                                .child(
-                                                    div()
-                                                        .font_weight(FontWeight::BOLD)
-                                                        .text_color(rgb(0x1d4ed8))
-                                                        .child(format!("{:.0}", cur_zo)),
-                                                )
-                                                .child(
-                                                    div()
-                                                        .text_xs()
-                                                        .text_color(rgb(0x64748b))
-                                                        .child("Ω"),
-                                                )
-                                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| {
-                                                    cx.stop_propagation();
-                                                    this.editing_zo = Some((idx, format!("{:.0}", cur_zo)));
-                                                    this.focus_handle.focus(window);
-                                                    cx.notify();
-                                                })),
+                                                .text_xs()
+                                                .text_color(rgb(0x64748b))
+                                                .child("Ω"),
                                         )
-                                        .child(
-                                            div()
-                                                .px_2()
-                                                .py_0p5()
-                                                .bg(rgb(0xf1f5f9))
-                                                .border_1()
-                                                .border_color(rgb(0xcbd5e1))
-                                                .rounded_md()
-                                                .cursor_pointer()
-                                                .hover(|s| s.bg(rgb(0xe2e8f0)))
-                                                .child("+5")
-                                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                                                    cx.stop_propagation();
-                                                    this.adjust_target_zo(idx, 5.0, cx);
-                                                })),
-                                        )
+                                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| {
+                                            cx.stop_propagation();
+                                            this.editing_zo = Some((idx, format!("{:.0}", cur_zo)));
+                                            this.focus_handle.focus(window);
+                                            cx.notify();
+                                        }))
                                 }
                             })
                             // 阻抗模式下拉框
                             .child(
                                 div()
                                     .relative()
-                                    .flex_1()
+                                    .w(px(135.0))
+                                    .flex_shrink_0()
                                     .child(
                                         div()
                                             .flex()
@@ -473,7 +434,7 @@ impl ImpedanceDesktopApp {
                                                         .gap_1()
                                                         .flex()
                                                         .flex_col()
-                                                        .children(["单端阻抗（外层）", "差分阻抗（外层）", "共面单端（外层）", "共面差分阻抗（外层）", "单端阻抗（内层）", "差分阻抗（内层）", "单端阻抗（不带防焊）"].iter().map(|&m| {
+                                                        .children(["单端阻抗（外层）", "差分阻抗（外层）", "单端阻抗（内层）", "差分阻抗（内层）", "共面单端（外层）", "共面差分阻抗（外层）", "单端阻抗（不带防焊）", "差分阻抗（不带防焊）", "共面单端阻抗（不带防焊）", "共面差分阻抗（不带防焊）"].iter().map(|&m| {
                                                             let is_sel = cur_mode == m;
                                                             div()
                                                                 .px_3()
@@ -500,7 +461,7 @@ impl ImpedanceDesktopApp {
                             .child(
                                 div()
                                     .relative()
-                                    .w(px(90.0))
+                                    .w(px(60.0))
                                     .flex_shrink_0()
                                     .child(
                                         div()
@@ -529,7 +490,7 @@ impl ImpedanceDesktopApp {
                                                 .child(
                                                     div()
                                                         .occlude()
-                                                        .w(px(90.0))
+                                                        .w(px(70.0))
                                                         .bg(rgb(0xffffff))
                                                         .border_2()
                                                         .border_color(rgb(0x059669))
@@ -566,9 +527,9 @@ impl ImpedanceDesktopApp {
                             .child(
                                 div()
                                     .relative()
-                                    .w(px(90.0))
+                                    .w(px(60.0))
                                     .flex_shrink_0()
-                                    .child(
+                                    .child(if can_have_up {
                                         div()
                                             .flex()
                                             .flex_row()
@@ -586,16 +547,30 @@ impl ImpedanceDesktopApp {
                                             .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
                                                 cx.stop_propagation();
                                                 this.toggle_dropdown(&up_drop_id, cx);
-                                            })),
-                                    )
-                                    .child(if is_up_open {
+                                            }))
+                                    } else {
+                                        div()
+                                            .flex()
+                                            .flex_row()
+                                            .items_center()
+                                            .justify_between()
+                                            .px_2p5()
+                                            .py_1()
+                                            .bg(rgb(0xf8fafc))
+                                            .border_1()
+                                            .border_color(rgb(0xe2e8f0))
+                                            .rounded_lg()
+                                            .child(div().text_color(rgb(0x94a3b8)).child("/"))
+                                            .child(div().text_color(rgb(0xcbd5e1)).child("-"))
+                                    })
+                                    .child(if is_up_open && can_have_up {
                                         deferred(
                                             anchored()
                                                 .snap_to_window()
                                                 .child(
                                                     div()
                                                         .occlude()
-                                                        .w(px(90.0))
+                                                        .w(px(70.0))
                                                         .bg(rgb(0xffffff))
                                                         .border_2()
                                                         .border_color(rgb(0x2563eb))
@@ -621,7 +596,7 @@ impl ImpedanceDesktopApp {
                                                                     this.set_req_up_ref(idx, None, cx);
                                                                 })),
                                                         )
-                                                        .children((1..=board_layer).map(|l| {
+                                                        .children((1..cur_layer).map(|l| {
                                                             let is_sel = cur_up == Some(l);
                                                             div()
                                                                 .px_3()
@@ -630,6 +605,7 @@ impl ImpedanceDesktopApp {
                                                                 .text_color(if is_sel { rgb(0x1d4ed8) } else { rgb(0x334155) })
                                                                 .font_weight(if is_sel { FontWeight::BOLD } else { FontWeight::NORMAL })
                                                                 .rounded_lg()
+                                                                .text_xs()
                                                                 .cursor_pointer()
                                                                 .child(format!("L{}", l))
                                                                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
@@ -648,9 +624,9 @@ impl ImpedanceDesktopApp {
                             .child(
                                 div()
                                     .relative()
-                                    .w(px(90.0))
+                                    .w(px(60.0))
                                     .flex_shrink_0()
-                                    .child(
+                                    .child(if can_have_down {
                                         div()
                                             .flex()
                                             .flex_row()
@@ -668,16 +644,30 @@ impl ImpedanceDesktopApp {
                                             .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
                                                 cx.stop_propagation();
                                                 this.toggle_dropdown(&down_drop_id, cx);
-                                            })),
-                                    )
-                                    .child(if is_down_open {
+                                            }))
+                                    } else {
+                                        div()
+                                            .flex()
+                                            .flex_row()
+                                            .items_center()
+                                            .justify_between()
+                                            .px_2p5()
+                                            .py_1()
+                                            .bg(rgb(0xf8fafc))
+                                            .border_1()
+                                            .border_color(rgb(0xe2e8f0))
+                                            .rounded_lg()
+                                            .child(div().text_color(rgb(0x94a3b8)).child("/"))
+                                            .child(div().text_color(rgb(0xcbd5e1)).child("-"))
+                                    })
+                                    .child(if is_down_open && can_have_down {
                                         deferred(
                                             anchored()
                                                 .snap_to_window()
                                                 .child(
                                                     div()
                                                         .occlude()
-                                                        .w(px(90.0))
+                                                        .w(px(70.0))
                                                         .bg(rgb(0xffffff))
                                                         .border_2()
                                                         .border_color(rgb(0x2563eb))
@@ -703,7 +693,7 @@ impl ImpedanceDesktopApp {
                                                                     this.set_req_down_ref(idx, None, cx);
                                                                 })),
                                                         )
-                                                        .children((1..=board_layer).map(|l| {
+                                                        .children(((cur_layer + 1)..=board_layer).map(|l| {
                                                             let is_sel = cur_down == Some(l);
                                                             div()
                                                                 .px_3()
@@ -712,6 +702,7 @@ impl ImpedanceDesktopApp {
                                                                 .text_color(if is_sel { rgb(0x1d4ed8) } else { rgb(0x334155) })
                                                                 .font_weight(if is_sel { FontWeight::BOLD } else { FontWeight::NORMAL })
                                                                 .rounded_lg()
+                                                                .text_xs()
                                                                 .cursor_pointer()
                                                                 .child(format!("L{}", l))
                                                                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
@@ -727,29 +718,20 @@ impl ImpedanceDesktopApp {
                                     }),
                             )
                             .child(render_numeric(NumericField::W1, format!("{:.2}", req.w1), unit.clone(), true))
-                            .child(render_numeric(NumericField::S1, req.s1.map(|v| format!("{:.2}", v)).unwrap_or_default(), unit.clone(), true))
+                            .child(render_numeric(NumericField::S1, req.s1.map(|v| format!("{:.2}", v)).unwrap_or_default(), unit.clone(), cur_mode.contains("差分")))
                             .child(render_numeric(NumericField::D1, req.d1.map(|v| format!("{:.2}", v)).unwrap_or_default(), unit.clone(), cur_mode.contains("共面")))
-                            // 容差
-                            .child(
-                                div()
-                                    .w(px(70.0))
-                                    .flex_shrink_0()
-                                    .text_color(rgb(0x475569))
-                                    .font_weight(FontWeight::BOLD)
-                                    .child("±0.5Ω"),
-                            )
                             // 操作
                             .child(
                                 div()
-                                    .w(px(110.0))
+                                    .w(px(85.0))
                                     .flex_shrink_0()
                                     .flex()
                                     .flex_row()
                                     .justify_center()
-                                    .gap_1p5()
+                                    .gap_1()
                                     .child(
                                         div()
-                                            .px_2()
+                                            .px_1p5()
                                             .py_0p5()
                                             .bg(rgb(0xf1f5f9))
                                             .border_1()
@@ -763,14 +745,14 @@ impl ImpedanceDesktopApp {
                                     )
                                     .child(
                                         div()
-                                            .px_2()
+                                            .px_1p5()
                                             .py_0p5()
-                                            .bg(rgb(0xfff1f2))
+                                            .bg(if self.requirements.len() > 1 { rgb(0xfff1f2) } else { rgb(0xf8fafc) })
                                             .border_1()
-                                            .border_color(rgb(0xfecdd3))
-                                            .text_color(rgb(0xe11d48))
+                                            .border_color(if self.requirements.len() > 1 { rgb(0xfecdd3) } else { rgb(0xe2e8f0) })
+                                            .text_color(if self.requirements.len() > 1 { rgb(0xe11d48) } else { rgb(0x94a3b8) })
                                             .rounded_md()
-                                            .cursor_pointer()
+                                            .cursor(if self.requirements.len() > 1 { CursorStyle::PointingHand } else { CursorStyle::Arrow })
                                             .child("删除")
                                             .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
                                                 this.delete_req(idx, cx);

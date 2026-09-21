@@ -27,6 +27,7 @@ impl Render for ImpedanceDesktopApp {
             .child(
                 div()
                     .w_full()
+                    .flex_none()
                     .bg(rgb(0xffffff))
                     .border_b_1()
                     .border_color(rgb(0xe2e8f0))
@@ -96,8 +97,8 @@ fn main() {
                     cx,
                 ))),
                 window_min_size: Some(Size {
-                    width: px(1000.0),
-                    height: px(680.0),
+                    width: px(1180.0),
+                    height: px(760.0),
                 }),
                 ..Default::default()
             },
