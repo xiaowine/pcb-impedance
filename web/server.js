@@ -112,6 +112,13 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
+// Node 默认 keepAliveTimeout = 5000ms。使用连接池的客户端（Java HttpClient / Go / Python requests /
+// axios / OkHttp）在空闲超过 5s 后复用连接时，会写进一条已被服务端关闭的 TCP 连接：
+// 请求静默挂死（无响应，直到客户端自身超时）或抛 ConnectionAbortedError —— 表现为
+// “上游没变慢、网关也不报错，但对端总是请求超时”。必须大于客户端连接池的空闲阈值。
+server.keepAliveTimeout = 65000;
+server.headersTimeout = 66000; // 必须大于 keepAliveTimeout
+
 server.listen(PORT, () => {
   console.log(`[PCB Impedance Server] running at http://localhost:${PORT}`);
 });
